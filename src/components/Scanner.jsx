@@ -29,37 +29,51 @@ export default function Scanner({ onAddBook, activeTab }) {
       const container = document.getElementById('reader');
       if (container) {
         setScannerActive(true);
-        html5QrcodeScanner = new Html5QrcodeScanner(
-          "reader",
-          {
-            fps: 10,
-            qrbox: { width: 280, height: 180 },
-            aspectRatio: 1.777778,
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true
+        try {
+          html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            {
+              fps: 10,
+              qrbox: { width: 280, height: 180 },
+              aspectRatio: 1.777778,
+              experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+              }
+            },
+            /* verbose= */ false
+          );
+
+          const onScanSuccess = async (decodedText, decodedResult) => {
+            console.log(`Kód naskenován = ${decodedText}`, decodedResult);
+            if (html5QrcodeScanner) {
+              html5QrcodeScanner.clear().catch(e => console.error(e));
             }
-          },
-          /* verbose= */ false
-        );
+            setScannerActive(false);
+            handleProcessISBN(decodedText);
+          };
 
-        const onScanSuccess = async (decodedText, decodedResult) => {
-          console.log(`Kód naskenován = ${decodedText}`, decodedResult);
-          html5QrcodeScanner.clear();
-          setScannerActive(false);
-          handleProcessISBN(decodedText);
-        };
+          const onScanFailure = (error) => {
+            // Continuous scanning, silence log noise
+          };
 
-        const onScanFailure = (error) => {
-          // Continuous scanning, silence log noise
-        };
-
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        } catch (err) {
+          console.warn("Kamera není k dispozici nebo je blokována:", err);
+          setStatusMessage({
+            type: 'info',
+            text: 'Kamera nebyla rozpoznána nebo je blokována. Můžete použít vyhledávání nebo nahrání obrázku.'
+          });
+        }
       }
     }
 
     return () => {
       if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().catch(err => console.error(err));
+        try {
+          html5QrcodeScanner.clear().catch(err => console.error(err));
+        } catch (e) {
+          console.error(e);
+        }
       }
     };
   }, [scanMethod, activeTab]);
