@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import Tesseract from 'tesseract.js';
 import { Camera, Search, BookOpen, AlertCircle, CheckCircle, RefreshCw, Upload, Sparkles } from 'lucide-react';
@@ -9,7 +9,6 @@ export default function Scanner({ onAddBook, activeTab }) {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success' | 'error' | 'info', text: '' }
   const [manualQuery, setManualQuery] = useState('');
-  const [scannerActive, setScannerActive] = useState(false);
 
   // Manual form detailed fields
   const [manualTitle, setManualTitle] = useState('');
@@ -20,65 +19,7 @@ export default function Scanner({ onAddBook, activeTab }) {
   const [ocrProcessing, setOcrProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
 
-  const scannerRef = useRef(null);
-
-  useEffect(() => {
-    let html5QrcodeScanner = null;
-
-    if (scanMethod === 'camera' && activeTab === 'scan') {
-      const container = document.getElementById('reader');
-      if (container) {
-        setScannerActive(true);
-        try {
-          html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader",
-            {
-              fps: 10,
-              qrbox: { width: 280, height: 180 },
-              aspectRatio: 1.777778,
-              experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-              }
-            },
-            /* verbose= */ false
-          );
-
-          const onScanSuccess = async (decodedText, decodedResult) => {
-            console.log(`Kód naskenován = ${decodedText}`, decodedResult);
-            if (html5QrcodeScanner) {
-              html5QrcodeScanner.clear().catch(e => console.error(e));
-            }
-            setScannerActive(false);
-            handleProcessISBN(decodedText);
-          };
-
-          const onScanFailure = (error) => {
-            // Continuous scanning, silence log noise
-          };
-
-          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-        } catch (err) {
-          console.warn("Kamera není k dispozici nebo je blokována:", err);
-          setStatusMessage({
-            type: 'info',
-            text: 'Kamera nebyla rozpoznána nebo je blokována. Můžete použít vyhledávání nebo nahrání obrázku.'
-          });
-        }
-      }
-    }
-
-    return () => {
-      if (html5QrcodeScanner) {
-        try {
-          html5QrcodeScanner.clear().catch(err => console.error(err));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-  }, [scanMethod, activeTab]);
-
-  const handleProcessISBN = async (isbn) => {
+  const handleProcessISBN = useCallback(async (isbn) => {
     setLoading(true);
     setStatusMessage({ type: 'info', text: `Vyhledávám knihu podle ISBN: ${isbn}...` });
 
@@ -99,6 +40,7 @@ export default function Scanner({ onAddBook, activeTab }) {
         setManualIsbn(isbn);
       }
     } catch (err) {
+      console.error('Chyba při vyhledávání ISBN:', err);
       setStatusMessage({
         type: 'error',
         text: 'Došlo k chybě při načítání dat o knize. Zkuste to znovu.'
@@ -106,7 +48,63 @@ export default function Scanner({ onAddBook, activeTab }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [onAddBook]);
+
+  useEffect(() => {
+    let html5QrcodeScanner = null;
+
+    if (scanMethod === 'camera' && activeTab === 'scan') {
+      const container = document.getElementById('reader');
+      if (container) {
+        try {
+          html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            {
+              fps: 10,
+              qrbox: { width: 280, height: 180 },
+              aspectRatio: 1.777778,
+              experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+              }
+            },
+            /* verbose= */ false
+          );
+
+          const onScanSuccess = async (decodedText, decodedResult) => {
+            console.log(`Kód naskenován = ${decodedText}`, decodedResult);
+            if (html5QrcodeScanner) {
+              html5QrcodeScanner.clear().catch(e => console.error(e));
+            }
+            handleProcessISBN(decodedText);
+          };
+
+          const onScanFailure = () => {
+            // Continuous scanning, silence log noise
+          };
+
+          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        } catch (err) {
+          console.warn("Kamera není k dispozici nebo je blokována:", err);
+          setTimeout(() => {
+            setStatusMessage({
+              type: 'info',
+              text: 'Kamera nebyla rozpoznána nebo je blokována. Můžete použít vyhledávání nebo nahrání obrázku.'
+            });
+          }, 0);
+        }
+      }
+    }
+
+    return () => {
+      if (html5QrcodeScanner) {
+        try {
+          html5QrcodeScanner.clear().catch(err => console.error(err));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+  }, [scanMethod, activeTab, handleProcessISBN]);
 
   const handleManualSearch = async (e) => {
     e.preventDefault();
@@ -131,6 +129,7 @@ export default function Scanner({ onAddBook, activeTab }) {
         });
       }
     } catch (err) {
+      console.error('Chyba při ručním vyhledávání:', err);
       setStatusMessage({ type: 'error', text: 'Chyba při hledání v databázi.' });
     } finally {
       setLoading(false);
