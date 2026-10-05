@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Scanner from './components/Scanner';
 import DatabaseTable from './components/DatabaseTable';
 import { loadStoredBooks, saveStoredBooks } from './utils/storage';
-import { Camera, Database, Library, BookOpen, Sparkles, Layers } from 'lucide-react';
+import { Camera, Database, Library } from 'lucide-react';
 
 export default function App() {
-  const [books, setBooks] = useState([]);
+  const [books, setBooks] = useState(() => loadStoredBooks());
   const [activeTab, setActiveTab] = useState('scan'); // 'scan' | 'database'
-
-  useEffect(() => {
-    const initialData = loadStoredBooks();
-    setBooks(initialData);
-  }, []);
 
   const handleAddBook = (newBook) => {
     setBooks((prev) => {
@@ -84,11 +79,32 @@ export default function App() {
               </div>
             </div>
 
-            <div className="hidden sm:flex items-center gap-3 text-xs font-semibold">
-              <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-400 flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                MDT & MDT-Třídění
-              </span>
+            <div className="flex items-center gap-2 text-xs font-semibold">
+              <button
+                onClick={handleSwitchToScanner}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
+                  activeTab === 'scan'
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/20'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-100 hover:border-slate-700'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Skenovat</span>
+              </button>
+              <button
+                onClick={handleSwitchToDatabase}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
+                  activeTab === 'database'
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/20'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-100 hover:border-slate-700'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>Databáze</span>
+                <span className="ml-0.5 bg-slate-950/60 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono px-1.5 py-0.2 rounded-full">
+                  {books.length}
+                </span>
+              </button>
             </div>
           </div>
         </header>
