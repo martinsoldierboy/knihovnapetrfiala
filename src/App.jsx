@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Scanner from './components/Scanner';
 import DatabaseTable from './components/DatabaseTable';
 import { loadStoredBooks, saveStoredBooks } from './utils/storage';
-import { Camera, Database, Library, BookOpen, Sparkles, Layers } from 'lucide-react';
+import { Camera, Database, Library, Layers } from 'lucide-react';
 
 export default function App() {
-  const [books, setBooks] = useState([]);
+  const [books, setBooks] = useState(() => loadStoredBooks());
   const [activeTab, setActiveTab] = useState('scan'); // 'scan' | 'database'
-
-  useEffect(() => {
-    const initialData = loadStoredBooks();
-    setBooks(initialData);
-  }, []);
 
   const handleAddBook = (newBook) => {
     setBooks((prev) => {
