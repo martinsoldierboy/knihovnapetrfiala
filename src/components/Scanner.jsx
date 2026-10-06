@@ -9,7 +9,6 @@ export default function Scanner({ onAddBook, activeTab }) {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success' | 'error' | 'info', text: '' }
   const [manualQuery, setManualQuery] = useState('');
-  const [scannerActive, setScannerActive] = useState(false);
 
   // Manual form detailed fields
   const [manualTitle, setManualTitle] = useState('');
@@ -20,63 +19,7 @@ export default function Scanner({ onAddBook, activeTab }) {
   const [ocrProcessing, setOcrProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
 
-  const scannerRef = useRef(null);
-
-  useEffect(() => {
-    let html5QrcodeScanner = null;
-
-    if (scanMethod === 'camera' && activeTab === 'scan') {
-      const container = document.getElementById('reader');
-      if (container) {
-        setScannerActive(true);
-        try {
-          html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader",
-            {
-              fps: 10,
-              qrbox: { width: 280, height: 180 },
-              aspectRatio: 1.777778,
-              experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-              }
-            },
-            /* verbose= */ false
-          );
-
-          const onScanSuccess = async (decodedText, decodedResult) => {
-            console.log(`Kód naskenován = ${decodedText}`, decodedResult);
-            if (html5QrcodeScanner) {
-              html5QrcodeScanner.clear().catch(e => console.error(e));
-            }
-            setScannerActive(false);
-            handleProcessISBN(decodedText);
-          };
-
-          const onScanFailure = (error) => {
-            // Continuous scanning, silence log noise
-          };
-
-          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-        } catch (err) {
-          console.warn("Kamera není k dispozici nebo je blokována:", err);
-          setStatusMessage({
-            type: 'info',
-            text: 'Kamera nebyla rozpoznána nebo je blokována. Můžete použít vyhledávání nebo nahrání obrázku.'
-          });
-        }
-      }
-    }
-
-    return () => {
-      if (html5QrcodeScanner) {
-        try {
-          html5QrcodeScanner.clear().catch(err => console.error(err));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-  }, [scanMethod, activeTab]);
+  const processISBNRef = useRef(null);
 
   const handleProcessISBN = async (isbn) => {
     setLoading(true);
@@ -98,7 +41,8 @@ export default function Scanner({ onAddBook, activeTab }) {
         setScanMethod('manual');
         setManualIsbn(isbn);
       }
-    } catch (err) {
+    } catch (error) {
+      console.error("Chyba při vyhledávání ISBN:", error);
       setStatusMessage({
         type: 'error',
         text: 'Došlo k chybě při načítání dat o knize. Zkuste to znovu.'
@@ -107,6 +51,68 @@ export default function Scanner({ onAddBook, activeTab }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    processISBNRef.current = handleProcessISBN;
+  });
+
+  useEffect(() => {
+    let html5QrcodeScanner = null;
+
+    if (scanMethod === 'camera' && activeTab === 'scan') {
+      const container = document.getElementById('reader');
+      if (container) {
+        try {
+          html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            {
+              fps: 10,
+              qrbox: { width: 280, height: 180 },
+              aspectRatio: 1.777778,
+              experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+              }
+            },
+            /* verbose= */ false
+          );
+
+          const onScanSuccess = async (decodedText, decodedResult) => {
+            console.log(`Kód naskenován = ${decodedText}`, decodedResult);
+            if (html5QrcodeScanner) {
+              html5QrcodeScanner.clear().catch(e => console.error(e));
+            }
+            if (processISBNRef.current) {
+              processISBNRef.current(decodedText);
+            }
+          };
+
+          const onScanFailure = () => {
+            // Continuous scanning, silence log noise
+          };
+
+          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        } catch (err) {
+          console.warn("Kamera není k dispozici nebo je blokována:", err);
+          setTimeout(() => {
+            setStatusMessage({
+              type: 'info',
+              text: 'Kamera nebyla rozpoznána nebo je blokována. Můžete použít vyhledávání nebo nahrání obrázku.'
+            });
+          }, 0);
+        }
+      }
+    }
+
+    return () => {
+      if (html5QrcodeScanner) {
+        try {
+          html5QrcodeScanner.clear().catch(err => console.error(err));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+  }, [scanMethod, activeTab]);
 
   const handleManualSearch = async (e) => {
     e.preventDefault();
@@ -130,7 +136,8 @@ export default function Scanner({ onAddBook, activeTab }) {
           text: `Pro výraz "${manualQuery}" nebyly nalezeny žádné výsledky. Vyplňte formulář níže.`
         });
       }
-    } catch (err) {
+    } catch (error) {
+      console.error("Chyba při ručním vyhledávání:", error);
       setStatusMessage({ type: 'error', text: 'Chyba při hledání v databázi.' });
     } finally {
       setLoading(false);
